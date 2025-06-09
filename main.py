@@ -1,6 +1,7 @@
 import numpy as np
 from src.utils import read_rgb_bitmap, shift_to_signed, pad_image_to_multiple
 from src.wavelet import dwt53_2d, idwt53_2d
+from src.bitplane_encoder import encode_bitplanes
 
 #CLI, passes arguments to the encoder and decoder
 #ccsds122_encoder.py to comress 
@@ -36,3 +37,14 @@ reconstructed_b = idwt53_2d(b_plane_coeffs, levels=1)
 assert np.array_equal(r_plane, reconstructed_r)
 assert np.array_equal(g_plane, reconstructed_g)
 assert np.array_equal(b_plane, reconstructed_b)
+
+
+symbols, contexts = encode_bitplanes(
+    [r_plane_coeffs, g_plane_coeffs, b_plane_coeffs],
+    levels=1
+)
+print(f"[Bit-plane Test] Produced {len(symbols)} symbols")
+
+zeros = symbols.count(0)
+ones  = symbols.count(1)
+print(f"Total symbols: {len(symbols)}, zeros: {zeros}, ones: {ones}")
