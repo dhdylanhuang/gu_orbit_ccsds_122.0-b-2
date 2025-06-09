@@ -1,11 +1,11 @@
+import numpy as np
 from src.utils import read_rgb_bitmap, shift_to_signed, pad_image_to_multiple
+from src.wavelet import dwt53_2d, idwt53_2d
 
 #CLI, passes arguments to the encoder and decoder
 #ccsds122_encoder.py to comress 
 #ccsds122_decoder.py to decompress
 
-
-# Now you can import from utils.py
 
 # 1. Read the RGB BMP:
 rgb_array = read_rgb_bitmap('data/sample_640×426.bmp')
@@ -24,4 +24,15 @@ b_plane = padded_array[:, :, 2]
 print("Padded R plane shape:", r_plane.shape)
 print("Padded G plane shape:", g_plane.shape)
 print("Padded B plane shape:", b_plane.shape)
-# Now each “plane” (r_plane, g_plane, b_plane) is ready for DWT.
+
+r_plane_coeffs = dwt53_2d(r_plane, levels=1)
+g_plane_coeffs = dwt53_2d(g_plane, levels=1)
+b_plane_coeffs = dwt53_2d(b_plane, levels=1)
+
+reconstructed_r = idwt53_2d(r_plane_coeffs, levels=1)
+reconstructed_g = idwt53_2d(g_plane_coeffs, levels=1)
+reconstructed_b = idwt53_2d(b_plane_coeffs, levels=1)
+
+assert np.array_equal(r_plane, reconstructed_r)
+assert np.array_equal(g_plane, reconstructed_g)
+assert np.array_equal(b_plane, reconstructed_b)
