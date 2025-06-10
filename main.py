@@ -2,6 +2,7 @@ import numpy as np
 from src.utils import read_rgb_bitmap, shift_to_signed, pad_image_to_multiple
 from src.wavelet import dwt53_2d, idwt53_2d
 from src.bitplane_encoder import encode_bitplanes
+from src.arithmetic_encoder import encode_arithmetic
 
 #CLI, passes arguments to the encoder and decoder
 #ccsds122_encoder.py to comress 
@@ -48,3 +49,15 @@ print(f"[Bit-plane Test] Produced {len(symbols)} symbols")
 zeros = symbols.count(0)
 ones  = symbols.count(1)
 print(f"Total symbols: {len(symbols)}, zeros: {zeros}, ones: {ones}")
+
+bitstream = encode_arithmetic(symbols, contexts)
+print(f"[Arithmetic Test] Produced {len(bitstream)} bytes")
+print(" First 10 bytes (hex):", bitstream[:10].hex())
+
+#Synthetic sanity check 
+#e.g. 200 zeros then 200 ones in a single context
+test_syms = [0]*200 + [1]*200
+test_ctxs = [0]*(200+200)
+test_bs = encode_arithmetic(test_syms, test_ctxs)
+print(f"[Synthetic Test] 400 input bits → {len(test_bs)} output bytes")
+print(" Synthetic bytes:", test_bs.hex())
