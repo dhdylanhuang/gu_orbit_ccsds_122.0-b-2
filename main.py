@@ -1,8 +1,11 @@
 import numpy as np
+import binascii
+import struct
 from src.utils import read_rgb_bitmap, shift_to_signed, pad_image_to_multiple
 from src.wavelet import dwt53_2d, idwt53_2d
 from src.bitplane_encoder import encode_bitplanes
 from src.arithmetic_encoder import encode_arithmetic
+from src.ccsds122_encoder import build_global_header
 
 #CLI, passes arguments to the encoder and decoder
 #ccsds122_encoder.py to comress 
@@ -61,3 +64,9 @@ test_ctxs = [0]*(200+200)
 test_bs = encode_arithmetic(test_syms, test_ctxs)
 print(f"[Synthetic Test] 400 input bits → {len(test_bs)} output bytes")
 print(" Synthetic bytes:", test_bs.hex())
+
+global_header = build_global_header(rgb_array.shape, padded_array.shape, levels=1)
+crc = binascii.crc32(bitstream) & 0xffffffff
+global_header += struct.pack('>I', crc)
+print(f"[Global Header Test] Header size: {len(global_header)} bytes")
+print(" Global header (hex):", global_header.hex())
