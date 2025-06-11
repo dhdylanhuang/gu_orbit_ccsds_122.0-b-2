@@ -3,7 +3,6 @@
 
 import struct
 import binascii
-import numpy as np
 from src.utils import read_rgb_bitmap, shift_to_signed, pad_image_to_multiple
 from src.wavelet import dwt53_2d
 from src.bitplane_encoder import encode_bitplanes
@@ -26,43 +25,42 @@ def build_global_header(orig_shape, padded_shape, levels):
 
 #Build per-packet header
 def build_packet_header(seq, length):
-    return struct.pack('>HH', seq, length)
+    return struct.pack('>HI', seq, length)
 
-# #Full pipeline for CCSDS 122.0-B-2 compression
-# def compress(input_path: str, output_path: str, levels=1):
-#     # 1. Preprocessing
-#     rgb = read_rgb_bitmap(input_path)
-#     signed = shift_to_signed(rgb)
-#     padded = pad_image_to_multiple(signed, factor=2**levels)
+def compress(input_path: str, output_path: str, levels=1):
+    # 1. Preprocessing
+    rgb = read_rgb_bitmap(input_path)
+    signed = shift_to_signed(rgb)
+    padded = pad_image_to_multiple(signed, factor=2**levels)
 
-#     # 2. DWT per channel
-#     coeffs = []
-#     for c in range(rgb.shape[2]):
-#         plane = padded[:, :, c]
-#         coeffs.append(dwt53_2d(plane, levels=levels))
+    # 2. DWT per channel
+    coeffs = []
+    for c in range(rgb.shape[2]):
+        plane = padded[:, :, c]
+        coeffs.append(dwt53_2d(plane, levels=levels))
 
-#     # 3. Bit-plane encode
-#     symbols, contexts = encode_bitplanes(coeffs, levels=levels)
+    # 3. Bit-plane encode
+    symbols, contexts = encode_bitplanes(coeffs, levels=levels)
 
-#     # 4. Arithmetic encode
-#     bitstream = encode_arithmetic(symbols, contexts)
+    # 4. Arithmetic encode
+    bitstream = encode_arithmetic(symbols, contexts)
 
-#     # 5. Build global header (CRC placeholder)
-#     global_header = build_global_header(rgb.shape, padded.shape, levels)
-#     # compute CRC of bitstream
-#     crc = binascii.crc32(bitstream) & 0xffffffff
-#     # append CRC to header
-#     global_header += struct.pack('>I', crc)
+    # 5. Build global header (CRC placeholder)
+    global_header = build_global_header(rgb.shape, padded.shape, levels)
+    # compute CRC of bitstream
+    crc = binascii.crc32(bitstream) & 0xffffffff
+    # append CRC to header
+    global_header += struct.pack('>I', crc)
 
-#     # 6. Write output: header + packetized payload
-#     with open(output_path, 'wb') as f:
-#         # write header
-#         f.write(global_header)
-#         # write packets
-#         seq = 0
-#         for i in range(0, len(bitstream), _MAX_PACKET_SIZE):
-#             chunk = bitstream[i:i + _MAX_PACKET_SIZE]
-#             pkt_hdr = build_packet_header(seq, len(chunk))
-#             f.write(pkt_hdr)
-#             f.write(chunk)
-#             seq += 1
+    # 6. Write output: header + packetized payload
+    with open(output_path, 'wb') as f:
+        # write header
+        f.write(global_header)
+        # write packets
+        seq = 0
+        for i in range(0, len(bitstream), _MAX_PACKET_SIZE):
+            chunk = bitstream[i:i + _MAX_PACKET_SIZE]
+            pkt_hdr = build_packet_header(seq, len(chunk))
+            f.write(pkt_hdr)
+            f.write(chunk)
+            seq += 1

@@ -1,72 +1,42 @@
+#!/usr/bin/env python3
+
+import argparse
 import numpy as np
-import binascii
-import struct
-from src.utils import read_rgb_bitmap, shift_to_signed, pad_image_to_multiple
-from src.wavelet import dwt53_2d, idwt53_2d
-from src.bitplane_encoder import encode_bitplanes
-from src.arithmetic_encoder import encode_arithmetic
-from src.ccsds122_encoder import build_global_header
-
-#CLI, passes arguments to the encoder and decoder
-#ccsds122_encoder.py to comress 
-#ccsds122_decoder.py to decompress
+from src.ccsds122_encoder import compress as ccsds_compress
+from src.ccsds122_decoder import decompress as ccsds_decompress
 
 
-# 1. Read the RGB BMP:
-rgb_array = read_rgb_bitmap('data/sample_640×426.bmp')
+def main():
+    parser = argparse.ArgumentParser(
+        description="CCSDS 122.0-B-2 Image Compressor/Decompressor"
+    )
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        '--compress', nargs=2, metavar=('INPUT_BMP', 'OUTPUT_CCSDS'),
+        help='Compress an RGB BMP to CCSDS 122.0-B-2 format'
+    )
+    group.add_argument(
+        '--decompress', nargs=2, metavar=('INPUT_CCSDS', 'OUTPUT_BMP'),
+        help='Decompress a CCSDS 122.0-B-2 file to BMP'
+    )
+    parser.add_argument(
+        '--levels', type=int, default=1,
+        help='Number of DWT levels to use (default: 1)'
+    )
+    args = parser.parse_args()
 
-# 2. Shift to signed integers (for lossless wavelet):
-signed_array = shift_to_signed(rgb_array)
+    if args.compress:
+        inp, out = args.compress
+        print(f"Compressing '{inp}' → '{out}' with {args.levels} DWT level(s) ...")
+        ccsds_compress(inp, out, levels=args.levels)
+        print(f"Compression complete. Output: {out}")
 
-# 3. Pad so both dimensions are even (factor=2 for one‐level DWT):
-padded_array = pad_image_to_multiple(signed_array, factor=2)
-
-# 4. If RGB, split into three separate 2D planes:
-r_plane = padded_array[:, :, 0]
-g_plane = padded_array[:, :, 1]
-b_plane = padded_array[:, :, 2]
-
-print("Padded R plane shape:", r_plane.shape)
-print("Padded G plane shape:", g_plane.shape)
-print("Padded B plane shape:", b_plane.shape)
-
-r_plane_coeffs = dwt53_2d(r_plane, levels=1)
-g_plane_coeffs = dwt53_2d(g_plane, levels=1)
-b_plane_coeffs = dwt53_2d(b_plane, levels=1)
-
-reconstructed_r = idwt53_2d(r_plane_coeffs, levels=1)
-reconstructed_g = idwt53_2d(g_plane_coeffs, levels=1)
-reconstructed_b = idwt53_2d(b_plane_coeffs, levels=1)
-
-assert np.array_equal(r_plane, reconstructed_r)
-assert np.array_equal(g_plane, reconstructed_g)
-assert np.array_equal(b_plane, reconstructed_b)
+    elif args.decompress:
+        inp, out = args.decompress
+        print(f"Decompressing '{inp}' → '{out}' ...")
+        ccsds_decompress(inp, out)
+        print(f"Decompression complete. Output: {out}")
 
 
-symbols, contexts = encode_bitplanes(
-    [r_plane_coeffs, g_plane_coeffs, b_plane_coeffs],
-    levels=1
-)
-print(f"[Bit-plane Test] Produced {len(symbols)} symbols")
-
-zeros = symbols.count(0)
-ones  = symbols.count(1)
-print(f"Total symbols: {len(symbols)}, zeros: {zeros}, ones: {ones}")
-
-bitstream = encode_arithmetic(symbols, contexts)
-print(f"[Arithmetic Test] Produced {len(bitstream)} bytes")
-print(" First 10 bytes (hex):", bitstream[:10].hex())
-
-#Synthetic sanity check 
-#e.g. 200 zeros then 200 ones in a single context
-test_syms = [0]*200 + [1]*200
-test_ctxs = [0]*(200+200)
-test_bs = encode_arithmetic(test_syms, test_ctxs)
-print(f"[Synthetic Test] 400 input bits → {len(test_bs)} output bytes")
-print(" Synthetic bytes:", test_bs.hex())
-
-global_header = build_global_header(rgb_array.shape, padded_array.shape, levels=1)
-crc = binascii.crc32(bitstream) & 0xffffffff
-global_header += struct.pack('>I', crc)
-print(f"[Global Header Test] Header size: {len(global_header)} bytes")
-print(" Global header (hex):", global_header.hex())
+if __name__ == '__main__':
+    main()
